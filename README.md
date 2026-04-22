@@ -1,0 +1,1 @@
+# Sistema-de-automatizaci-n-de-tareas-de-recursos-humanos-como-gesti-n-de-solicitudes-de-curr-culos.
