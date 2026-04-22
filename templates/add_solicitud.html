@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Nueva solicitud · s.curriculums{% endblock %}
+{% block page_title %}Nueva solicitud{% endblock %}
+{% block page_sub %}Registrar solicitud de empleado{% endblock %}
+{% block top_actions %}<a href="{{ url_for('solicitudes') }}" class="btn btn-muted btn-sm">← Cancelar</a>{% endblock %}
+
+{% block content %}
+<div style="max-width:560px">
+  <form method="POST" action="{{ url_for('add_solicitud') }}">
+    <div class="card" style="margin-bottom:16px">
+      <div class="section-label" style="margin-top:0">Datos del empleado</div>
+      <div class="form-group"><label class="form-label">Nombre del empleado *</label><input name="employee" class="form-control" required placeholder="Nombre Apellidos"/></div>
+      <div class="form-group">
+        <label class="form-label">Departamento</label>
+        <select name="department" class="form-control">
+          {% for d in ["Tecnología","Producto","Operaciones","BI","Marketing","RRHH","Finanzas","Legal"] %}
+            <option>{{ d }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <div class="section-label" style="margin-top:0">Tipo de solicitud</div>
+      <div class="form-group">
+        <label class="form-label">Tipo *</label>
+        <select name="type" class="form-control">
+          {% for t in ["Vacaciones","Permiso médico","Teletrabajo","Formación","Permiso personal","Maternidad/Paternidad","Reducción de jornada","Excedencia"] %}
+            <option>{{ t }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="grid-2" style="gap:14px">
+        <div class="form-group"><label class="form-label">Número de días</label><input name="days" type="number" class="form-control" min="1" value="1"/></div>
+        <div></div>
+        <div class="form-group"><label class="form-label">Fecha inicio</label><input name="date_from" type="date" class="form-control"/></div>
+        <div class="form-group"><label class="form-label">Fecha fin</label><input name="date_to" type="date" class="form-control"/></div>
+      </div>
+      <div class="form-group"><label class="form-label">Nota o motivo (opcional)</label><textarea name="note" class="form-control" rows="3" placeholder="Contexto adicional de la solicitud…"></textarea></div>
+    </div>
+
+    <div style="display:flex;gap:12px">
+      <button type="submit" class="btn btn-primary">✓ Crear solicitud</button>
+      <a href="{{ url_for('solicitudes') }}" class="btn btn-muted">Cancelar</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

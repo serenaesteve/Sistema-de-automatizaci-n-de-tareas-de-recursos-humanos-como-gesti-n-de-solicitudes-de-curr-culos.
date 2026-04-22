@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Asistente IA · s.curriculums{% endblock %}
+{% block page_title %}Asistente IA{% endblock %}
+{% block page_sub %}Powered by Ollama · LLaMA 3 · 100% local{% endblock %}
+
+{% block content %}
+<div style="max-width:760px">
+  <div class="chat-container">
+    <div class="chat-messages" id="chatMessages">
+      <div class="chat-msg">
+        <div class="chat-avatar">✦</div>
+        <div class="chat-bubble assistant">
+          Hola, soy tu asistente de RRHH con IA local (Ollama). Puedo ayudarte a redactar políticas, analizar solicitudes, preparar descripciones de puestos, responder dudas sobre legislación laboral española o generar cualquier documento de RRHH. ¿En qué te ayudo hoy?
+        </div>
+      </div>
+    </div>
+
+    <div class="chat-suggestions" id="suggestions">
+      {% for s in [
+        "Redacta una política de teletrabajo para empresa española",
+        "¿Cuántos días de vacaciones tienen derecho los trabajadores en España?",
+        "Genera una descripción de puesto para Desarrollador Full Stack",
+        "Plantilla de carta de bienvenida para nuevo empleado",
+        "¿Qué dice el Estatuto de los Trabajadores sobre permisos médicos?",
+        "Crea un plan de onboarding de 30 días"
+      ] %}
+        <button class="suggestion-btn" onclick="useSuggestion(this)">{{ s }}</button>
+      {% endfor %}
+    </div>
+
+    <div class="chat-input-bar">
+      <input id="chatInput" placeholder="Escribe tu pregunta de RRHH…"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}"
+        autocomplete="off"/>
+      <button class="chat-send-btn" id="sendBtn" onclick="sendMsg()">→</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let history = [];
+
+function useSuggestion(btn) {
+  document.getElementById('chatInput').value = btn.textContent;
+  document.getElementById('suggestions').style.display = 'none';
+  sendMsg();
+}
+
+function addMsg(role, text) {
+  const wrap = document.getElementById('chatMessages');
+  const div = document.createElement('div');
+  div.className = `chat-msg ${role === 'user' ? 'user' : ''}`;
+  if(role === 'assistant') {
+    div.innerHTML = `<div class="chat-avatar">✦</div><div class="chat-bubble assistant">${text.replace(/\n/g,'<br>')}</div>`;
+  } else {
+    div.innerHTML = `<div class="chat-bubble user">${text.replace(/\n/g,'<br>')}</div>`;
+  }
+  wrap.appendChild(div);
+  wrap.scrollTop = wrap.scrollHeight;
+  return div;
+}
+
+function addLoader() {
+  const wrap = document.getElementById('chatMessages');
+  const div = document.createElement('div');
+  div.className = 'chat-msg';
+  div.innerHTML = `<div class="chat-avatar">✦</div><div class="chat-bubble assistant"><span class="dots-loader"><span></span><span></span><span></span></span></div>`;
+  div.id = 'loader';
+  wrap.appendChild(div);
+  wrap.scrollTop = wrap.scrollHeight;
+}
+
+async function sendMsg() {
+  const input = document.getElementById('chatInput');
+  const msg = input.value.trim();
+  if(!msg) return;
+
+  document.getElementById('suggestions').style.display = 'none';
+  input.value = '';
+  document.getElementById('sendBtn').disabled = true;
+
+  addMsg('user', msg);
+  addLoader();
+
+  try {
+    const res = await fetch('/api/chat', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ message: msg, history })
+    });
+    const d = await res.json();
+    document.getElementById('loader')?.remove();
+    const reply = d.response || 'Sin respuesta.';
+    addMsg('assistant', reply);
+    history.push({role:'user',content:msg},{role:'assistant',content:reply});
+    // keep last 10 messages in history
+    if(history.length > 10) history = history.slice(-10);
+  } catch(e) {
+    document.getElementById('loader')?.remove();
+    addMsg('assistant', '⚠️ Error al conectar con Ollama. Asegúrate de que está ejecutándose con: <code>ollama serve</code>');
+  }
+
+  document.getElementById('sendBtn').disabled = false;
+  input.focus();
+}
+</script>
+{% endblock %}

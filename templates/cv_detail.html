@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block title %}{{ cv.name }} · s.curriculums{% endblock %}
+{% block page_title %}{{ cv.name }}{% endblock %}
+{% block page_sub %}{{ cv.position }}{% endblock %}
+
+{% block top_actions %}
+  <a href="{{ url_for('curriculos') }}" class="btn btn-muted btn-sm">← Volver</a>
+  <button class="btn btn-ghost btn-sm" onclick="toggleStar()" id="starBtn">
+    {% if cv.starred %}★ Destacado{% else %}☆ Destacar{% endif %}
+  </button>
+{% endblock %}
+
+{% block content %}
+<div class="grid-2" style="gap:24px;align-items:start">
+  <!-- Left col -->
+  <div>
+    <!-- Score card -->
+    <div class="card" style="margin-bottom:16px">
+      <div style="display:flex;gap:20px;align-items:center">
+        {% set sc = "#00C48C" if cv.score >= 80 else "#F5A623" if cv.score >= 60 else "#FF4060" %}
+        <svg width="72" height="72" style="flex-shrink:0;transform:rotate(-90deg)">
+          <circle cx="36" cy="36" r="28" fill="none" stroke="var(--faint)" stroke-width="6"/>
+          <circle cx="36" cy="36" r="28" fill="none" stroke="{{ sc }}" stroke-width="6"
+            stroke-dasharray="{{ (cv.score/100)*175.9 }} 175.9" stroke-linecap="round"/>
+        </svg>
+        <div style="position:relative;margin-left:-88px;width:72px;text-align:center">
+          <div style="font-size:18px;font-weight:900;color:{{ sc }};line-height:72px">{{ cv.score }}</div>
+        </div>
+        <div style="margin-left:16px">
+          <span class="badge badge-{{ cv.status }}" style="margin-bottom:8px;display:inline-block">{{ cv.status }}</span>
+          <div style="font-size:12px;color:var(--muted)">Puntuación IA · {{ cv.phase }}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:3px">Aplicó el {{ cv.applied_date }}</div>
+        </div>
+        {% if cv.pdf_path %}
+        <span style="margin-left:auto;font-size:11px;color:var(--muted);background:var(--faint);padding:3px 10px;border-radius:20px">📄 PDF</span>
+        {% endif %}
+      </div>
+
+      {% if cv.summary %}
+      <div style="margin-top:16px;background:var(--pink-dim);border:1px solid #E8186D20;border-radius:10px;padding:12px;font-size:12px;color:#ccc;line-height:1.65">
+        {{ cv.summary }}
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Contact info -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="section-label" style="margin-top:0">Información de contacto</div>
+      <div class="detail-row"><span class="detail-row-label">Email</span><span class="detail-row-value">{{ cv.email or '—' }}</span></div>
+      <div class="detail-row"><span class="detail-row-label">Teléfono</span><span class="detail-row-value">{{ cv.phone or '—' }}</span></div>
+      <div class="detail-row"><span class="detail-row-label">LinkedIn</span><span class="detail-row-value">{{ cv.linkedin or '—' }}</span></div>
+      <div class="detail-row"><span class="detail-row-label">Ubicación</span><span class="detail-row-value">{{ cv.location or '—' }}</span></div>
+      <div class="detail-row"><span class="detail-row-label">Salario esperado</span><span class="detail-row-value">{{ cv.salary or '—' }}</span></div>
+      <div class="detail-row"><span class="detail-row-label">Experiencia</span><span class="detail-row-value">{{ cv.experience or '—' }}</span></div>
+      <div class="detail-row" style="border:none"><span class="detail-row-label">Educación</span><span class="detail-row-value">{{ cv.education or '—' }}</span></div>
+    </div>
+
+    <!-- Skills -->
+    {% if cv.skills %}
+    <div class="card">
+      <div class="section-label" style="margin-top:0">Habilidades</div>
+      <div class="skills-wrap">
+        {% for skill in cv.skills.split(',') %}
+          {% if skill.strip() %}
+            <span class="skill-tag">{{ skill.strip() }}</span>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Right col -->
+  <div>
+    <!-- Change phase -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="section-label" style="margin-top:0">Fase del proceso</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        {% set phases = ["Revisión CV","Primera entrevista","Entrevista técnica","Oferta enviada","Incorporado","Descartado"] %}
+        {% for phase in phases %}
+        <button onclick="changePhase('{{ phase }}')"
+          class="btn {% if cv.phase == phase %}btn-ghost{% else %}btn-muted{% endif %} btn-sm"
+          style="text-align:left;justify-content:flex-start">
+          {% if cv.phase == phase %}▶ {% endif %}{{ phase }}
+        </button>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Notes -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="section-label" style="margin-top:0">Notas</div>
+      {% if cv.notes %}
+        <div style="font-size:12px;color:#ccc;background:var(--surface2);border-radius:10px;padding:12px;line-height:1.65;margin-bottom:12px">{{ cv.notes }}</div>
+      {% endif %}
+      <textarea id="noteText" class="form-control" rows="3" placeholder="Añadir observación, resultado de entrevista…">{{ cv.notes or '' }}</textarea>
+      <button onclick="saveNote()" class="btn btn-ghost btn-sm btn-full" style="margin-top:8px">Guardar nota</button>
+    </div>
+
+    <!-- AI Report -->
+    <div class="card">
+      <div class="section-label" style="margin-top:0">Informe IA</div>
+      <button id="reportBtn" onclick="generateReport()" class="btn btn-ghost btn-full">
+        ✦ Generar informe de evaluación
+      </button>
+      {% if cv.ai_report %}
+      <div class="ai-box" style="margin-top:14px">
+        <div class="ai-box-label">✦ Informe generado</div>
+        {{ cv.ai_report }}
+      </div>
+      {% else %}
+      <div id="aiReportBox" style="display:none" class="ai-box">
+        <div class="ai-box-label">✦ Informe IA</div>
+        <div id="aiReportText"></div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const cvId = {{ cv.id }};
+
+async function toggleStar() {
+  const res = await fetch(`/api/cv/${cvId}/star`, {method:'POST'});
+  const d = await res.json();
+  document.getElementById('starBtn').textContent = d.starred ? '★ Destacado' : '☆ Destacar';
+}
+
+async function changePhase(phase) {
+  await fetch(`/api/cv/${cvId}/phase`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({phase})
+  });
+  window.location.reload();
+}
+
+async function saveNote() {
+  const note = document.getElementById('noteText').value;
+  await fetch(`/api/cv/${cvId}/note`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({note})
+  });
+  const btn = event.target;
+  btn.textContent = '✓ Guardado';
+  btn.className = 'btn btn-success btn-sm btn-full';
+  setTimeout(() => { btn.textContent='Guardar nota'; btn.className='btn btn-ghost btn-sm btn-full'; }, 2000);
+}
+
+async function generateReport() {
+  const btn = document.getElementById('reportBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="dots-loader"><span></span><span></span><span></span></span> Generando informe…';
+  const res = await fetch(`/api/cv/${cvId}/report`, {method:'POST'});
+  const d = await res.json();
+  btn.disabled = false;
+  btn.innerHTML = '✦ Regenerar informe';
+  const box = document.getElementById('aiReportBox');
+  if(box) {
+    box.style.display = 'block';
+    document.getElementById('aiReportText').textContent = d.report;
+  }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Añadir candidato · s.curriculums{% endblock %}
+{% block page_title %}Añadir candidato{% endblock %}
+{% block page_sub %}Registro manual de nuevo candidato{% endblock %}
+{% block top_actions %}<a href="{{ url_for('curriculos') }}" class="btn btn-muted btn-sm">← Cancelar</a>{% endblock %}
+
+{% block content %}
+<div style="max-width:700px">
+  <form method="POST" action="{{ url_for('add_cv') }}">
+    <div class="card" style="margin-bottom:16px">
+      <div class="section-label" style="margin-top:0">Información básica</div>
+      <div class="grid-2" style="gap:14px">
+        <div class="form-group"><label class="form-label">Nombre completo *</label><input name="name" class="form-control" required placeholder="Nombre Apellidos"/></div>
+        <div class="form-group"><label class="form-label">Puesto al que aplica *</label>
+          <select name="position" class="form-control">
+            {% for p in ["Desarrollador Full Stack","Diseñadora UX/UI","Analista de Datos","DevOps Engineer","Product Manager","QA Engineer","Marketing Manager","Otro"] %}
+              <option>{{ p }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Email</label><input name="email" type="email" class="form-control" placeholder="candidato@email.com"/></div>
+        <div class="form-group"><label class="form-label">Teléfono</label><input name="phone" class="form-control" placeholder="+34 6XX XXX XXX"/></div>
+        <div class="form-group"><label class="form-label">LinkedIn</label><input name="linkedin" class="form-control" placeholder="linkedin.com/in/…"/></div>
+        <div class="form-group"><label class="form-label">Ubicación</label><input name="location" class="form-control" placeholder="Ciudad"/></div>
+        <div class="form-group"><label class="form-label">Salario esperado</label><input name="salary" class="form-control" placeholder="Ej: 35.000–40.000€"/></div>
+        <div class="form-group"><label class="form-label">Experiencia</label><input name="experience" class="form-control" placeholder="Ej: 3 años"/></div>
+      </div>
+      <div class="form-group"><label class="form-label">Educación</label><input name="education" class="form-control" placeholder="Grado en Informática – Universidad…"/></div>
+      <div class="form-group"><label class="form-label">Habilidades (separadas por coma)</label><input name="skills" class="form-control" placeholder="React, Python, SQL, Docker…"/></div>
+      <div class="form-group"><label class="form-label">Resumen del perfil</label><textarea name="summary" class="form-control" rows="3" placeholder="Breve descripción del candidato…"></textarea></div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px">
+      <div class="section-label" style="margin-top:0">Evaluación</div>
+      <div class="grid-2" style="gap:14px">
+        <div class="form-group">
+          <label class="form-label">Puntuación (0–100)</label>
+          <input name="score" type="number" class="form-control" min="0" max="100" value="60"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Estado inicial</label>
+          <select name="status" class="form-control">
+            <option value="top">Top candidato</option>
+            <option value="revisar" selected>Revisar</option>
+            <option value="descartado">Descartado</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:12px">
+      <button type="submit" class="btn btn-primary">✓ Guardar candidato</button>
+      <a href="{{ url_for('curriculos') }}" class="btn btn-muted">Cancelar</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · s.curriculums{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block page_sub %}Resumen del sistema de RRHH · {{ session.user_name }}{% endblock %}
+
+{% block content %}
+<!-- KPI Cards -->
+<div class="grid-4" style="margin-bottom:28px">
+  {% set kpis = [
+    ("👥", total_cvs, "Candidatos total", "#E8186D"),
+    ("⭐", top, "Top candidatos", "#00C48C"),
+    ("📋", pending, "Solicitudes pendientes", "#F5A623"),
+    ("🔍", total_cvs - cvs|selectattr("phase","equalto","Descartado")|list|length - cvs|selectattr("phase","equalto","Incorporado")|list|length, "En selección", "#7B61FF"),
+  ] %}
+  {% for icon, val, label, color in kpis %}
+  <div class="stat-card" style="border:1px solid {{ color }}22">
+    <div class="stat-icon">{{ icon }}</div>
+    <div class="stat-value" style="color:{{ color }}">{{ val }}</div>
+    <div class="stat-label">{{ label }}</div>
+    <div class="stat-orb" style="background:{{ color }}"></div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="grid-2" style="gap:20px">
+  <!-- Pipeline -->
+  <div class="card">
+    <div class="section-label" style="margin-top:0">Pipeline de selección</div>
+    {% set pipeline_phases = ["Revisión CV","Primera entrevista","Entrevista técnica","Oferta enviada","Incorporado"] %}
+    {% for phase in pipeline_phases %}
+      {% set count = phases.get(phase, 0) %}
+      <div class="pipeline-row">
+        <div class="pipeline-label">{{ phase }}</div>
+        <div class="pipeline-track">
+          <div class="pipeline-fill" style="width:{{ [count * 30, 100]|min }}%"></div>
+        </div>
+        <div class="pipeline-count">{{ count }}</div>
+      </div>
+    {% endfor %}
+  </div>
+
+  <!-- Distribution -->
+  <div class="card">
+    <div class="section-label" style="margin-top:0">Distribución de puntuación</div>
+    <div class="grid-3" style="margin-bottom:20px">
+      {% set dist = [
+        ("Top 80+", "#00C48C", cvs|selectattr("score","ge",80)|list|length),
+        ("Revisar 60–79", "#F5A623", cvs|selectattr("score","ge",60)|selectattr("score","lt",80)|list|length),
+        ("Descartar <60", "#FF4060", cvs|selectattr("score","lt",60)|list|length),
+      ] %}
+      {% for label, color, n in dist %}
+      <div style="background:var(--surface2);border:1px solid {{ color }}22;border-radius:12px;padding:14px 10px;text-align:center">
+        <div style="font-size:26px;font-weight:900;color:{{ color }};font-family:'Playfair Display',serif">{{ n }}</div>
+        <div style="font-size:9px;color:var(--muted);margin-top:4px;font-weight:700;line-height:1.3">{{ label }}</div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="section-label">Solicitudes recientes</div>
+    {% for r in recent_requests %}
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border)">
+      <div>
+        <div style="font-size:13px;font-weight:700">{{ r.employee }}</div>
+        <div style="font-size:11px;color:var(--muted)">{{ r.type }} · {{ r.days }}d</div>
+      </div>
+      <span class="badge badge-{{ r.status }}">{{ r.status }}</span>
+    </div>
+    {% endfor %}
+    <a href="{{ url_for('solicitudes') }}" class="btn btn-muted btn-sm" style="margin-top:14px;width:100%">Ver todas las solicitudes →</a>
+  </div>
+</div>
+
+<!-- Recent CVs -->
+<div class="section-label">Candidatos recientes</div>
+<div class="table-wrap card" style="padding:0;overflow:hidden">
+  <table>
+    <thead>
+      <tr>
+        <th>Candidato</th>
+        <th>Puesto</th>
+        <th>Puntuación</th>
+        <th>Fase</th>
+        <th>Estado</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for cv in cvs[:8] %}
+      <tr>
+        <td>
+          <strong>{{ cv.name }}</strong>
+          {% if cv.starred %}<span style="color:var(--yellow);margin-left:5px">★</span>{% endif %}
+        </td>
+        <td style="color:var(--muted)">{{ cv.position }}</td>
+        <td>
+          {% set score_color = "#00C48C" if cv.score >= 80 else "#F5A623" if cv.score >= 60 else "#FF4060" %}
+          <div class="score-bar-wrap" style="min-width:120px">
+            <div class="score-bar-track">
+              <div class="score-bar-fill" style="width:{{ cv.score }}%;background:{{ score_color }}"></div>
+            </div>
+            <span class="score-label" style="color:{{ score_color }}">{{ cv.score }}</span>
+          </div>
+        </td>
+        <td><span class="badge badge-phase">{{ cv.phase }}</span></td>
+        <td><span class="badge badge-{{ cv.status }}">{{ cv.status }}</span></td>
+        <td><a href="{{ url_for('cv_detail', cv_id=cv.id) }}" class="btn btn-muted btn-sm">Ver →</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<div style="margin-top:12px">
+  <a href="{{ url_for('curriculos') }}" class="btn btn-ghost">Ver todos los currículos →</a>
+</div>
+{% endblock %}

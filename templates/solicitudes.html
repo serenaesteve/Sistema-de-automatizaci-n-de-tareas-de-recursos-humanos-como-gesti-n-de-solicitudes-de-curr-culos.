@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}Solicitudes · s.curriculums{% endblock %}
+{% block page_title %}Solicitudes{% endblock %}
+{% block page_sub %}Gestión de solicitudes de empleados{% endblock %}
+{% block top_actions %}<a href="{{ url_for('add_solicitud') }}" class="btn btn-primary btn-sm">+ Nueva solicitud</a>{% endblock %}
+
+{% block content %}
+<!-- Filters -->
+<div class="filters">
+  {% for f, label, cls in [("todas","Todas","pink"),("pendiente","Pendientes","yellow"),("aprobada","Aprobadas","green"),("rechazada","Rechazadas","red")] %}
+    <a href="?status={{ f }}" class="filter-pill {% if status_filter == f %}active-{{ cls }}{% endif %}">{{ label }}</a>
+  {% endfor %}
+</div>
+
+{% if requests %}
+<div class="card" style="padding:0;overflow:hidden">
+  <table>
+    <thead>
+      <tr>
+        <th>Empleado</th>
+        <th>Departamento</th>
+        <th>Tipo</th>
+        <th>Período</th>
+        <th>Días</th>
+        <th>Estado</th>
+        <th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in requests %}
+      <tr>
+        <td><strong>{{ r.employee }}</strong></td>
+        <td style="color:var(--muted);font-size:12px">{{ r.department }}</td>
+        <td><span class="badge badge-phase">{{ r.type }}</span></td>
+        <td style="font-size:11px;color:var(--muted)">{{ r.date_from }}{% if r.date_to and r.date_to != r.date_from %} → {{ r.date_to }}{% endif %}</td>
+        <td style="font-weight:800;color:var(--text)">{{ r.days }}d</td>
+        <td><span class="badge badge-{{ r.status }}">{{ r.status }}</span></td>
+        <td>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            {% if r.status == 'pendiente' %}
+              <button onclick="changeStatus({{ r.id }},'aprobada')" class="btn btn-success btn-sm">✓ Aprobar</button>
+              <button onclick="changeStatus({{ r.id }},'rechazada')" class="btn btn-danger btn-sm">✕ Rechazar</button>
+            {% endif %}
+            <button onclick="openDetail({{ r.id }})" class="btn btn-muted btn-sm">IA →</button>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card" style="text-align:center;padding:60px;color:var(--muted)">
+  <div style="font-size:40px;margin-bottom:14px">📭</div>
+  <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px">Sin solicitudes</div>
+  <a href="{{ url_for('add_solicitud') }}" class="btn btn-primary" style="margin-top:16px">+ Nueva solicitud</a>
+</div>
+{% endif %}
+
+<!-- Detail modal -->
+<div class="modal-overlay" id="detailModal" style="display:none">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle">Solicitud</div>
+      <button class="modal-close" onclick="closeDetail()">✕</button>
+    </div>
+    <div id="modalContent"></div>
+
+    <div class="section-label">Recomendación IA</div>
+    <button id="aiBtn" onclick="getAI()" class="btn btn-ghost btn-full">
+      ✦ Obtener recomendación de Ollama
+    </button>
+    <div id="aiBox" style="display:none" class="ai-box">
+      <div class="ai-box-label">✦ Análisis de la IA</div>
+      <div id="aiContent"></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const requests = {{ requests | tojson }};
+let currentId = null;
+
+function changeStatus(id, status) {
+  fetch(`/api/request/${id}/status`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({status})
+  }).then(() => window.location.reload());
+}
+
+function openDetail(id) {
+  currentId = id;
+  const r = requests.find(x => x.id === id);
+  document.getElementById('modalTitle').textContent = `${r.type} — ${r.employee}`;
+  document.getElementById('modalContent').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0">
+      ${row('Empleado', r.employee)}
+      ${row('Departamento', r.department)}
+      ${row('Tipo', r.type)}
+      ${row('Días', r.days + ' día' + (r.days!=1?'s':''))}
+      ${row('Desde', r.date_from || '—')}
+      ${row('Hasta', r.date_to || '—')}
+      ${row('Solicitado', r.created_at || '—')}
+      ${row('Estado', `<span class="badge badge-${r.status}">${r.status}</span>`)}
+    </div>
+    ${r.note ? `<div style="margin-top:12px;background:var(--surface2);border-radius:10px;padding:12px;font-size:12px;color:#ccc;line-height:1.6">"${r.note}"</div>` : ''}
+    ${r.status === 'pendiente' ? `<div style="display:flex;gap:8px;margin-top:14px">
+      <button onclick="changeStatus(${id},'aprobada')" class="btn btn-success" style="flex:1">✓ Aprobar</button>
+      <button onclick="changeStatus(${id},'rechazada')" class="btn btn-danger" style="flex:1">✕ Rechazar</button>
+    </div>` : ''}
+  `;
+  document.getElementById('aiBox').style.display = 'none';
+  document.getElementById('detailModal').style.display = 'flex';
+}
+
+function row(l, v) {
+  return `<div class="detail-row" style="grid-column:span 1"><span class="detail-row-label">${l}</span><span class="detail-row-value">${v}</span></div>`;
+}
+
+function closeDetail() { document.getElementById('detailModal').style.display='none'; }
+
+async function getAI() {
+  const btn = document.getElementById('aiBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="dots-loader"><span></span><span></span><span></span></span> Consultando Ollama…';
+  const res = await fetch(`/api/request/${currentId}/ai`, {method:'POST'});
+  const d = await res.json();
+  document.getElementById('aiContent').textContent = d.recommendation;
+  document.getElementById('aiBox').style.display = 'block';
+  btn.disabled = false;
+  btn.innerHTML = '✦ Regenerar recomendación';
+}
+</script>
+{% endblock %}

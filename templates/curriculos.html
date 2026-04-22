@@ -1,0 +1,320 @@
+{% extends "base.html" %}
+{% block title %}Currículos · s.curriculums{% endblock %}
+{% block page_title %}Currículos{% endblock %}
+{% block page_sub %}{{ cvs|length }} candidato{% if cvs|length != 1 %}s{% endif %} encontrado{% if cvs|length != 1 %}s{% endif %}{% endblock %}
+
+{% block top_actions %}
+  <a href="{{ url_for('add_cv') }}" class="btn btn-muted btn-sm">+ Manual</a>
+  <button class="btn btn-ghost btn-sm" onclick="openUploadModal()">📄 Subir PDF</button>
+  <button class="btn btn-primary btn-sm" onclick="openAnalyzeModal()">✦ Analizar PDF con IA</button>
+{% endblock %}
+
+{% block content %}
+<!-- Search -->
+<form method="GET" action="{{ url_for('curriculos') }}">
+  <div class="search-bar">
+    <span class="search-icon">🔍</span>
+    <input name="q" value="{{ search }}" placeholder="Buscar candidato o puesto..." autocomplete="off"/>
+    <input type="hidden" name="status" value="{{ status_filter }}"/>
+    <input type="hidden" name="pos" value="{{ pos_filter }}"/>
+    <button type="submit" class="btn btn-primary btn-sm">Buscar</button>
+    {% if search %}<a href="{{ url_for('curriculos') }}" class="btn btn-muted btn-sm">✕ Limpiar</a>{% endif %}
+  </div>
+</form>
+
+<!-- Status filters -->
+<div class="filters">
+  {% for f, label, cls in [("todas","Todas","pink"),("top","Top","green"),("revisar","Revisar","yellow"),("descartado","Descartado","red")] %}
+    <a href="?status={{ f }}&pos={{ pos_filter }}&q={{ search }}"
+       class="filter-pill {% if status_filter == f %}active-{{ cls }}{% endif %}">
+      {{ label }}
+    </a>
+  {% endfor %}
+  <span style="color:var(--border2);margin:0 4px">|</span>
+  {% for p in all_positions %}
+    <a href="?status={{ status_filter }}&pos={{ p.position }}&q={{ search }}"
+       class="filter-pill {% if pos_filter == p.position %}active-pink{% endif %}">
+      {{ p.position.split(' ')[0] }}
+    </a>
+  {% endfor %}
+  {% if pos_filter %}
+    <a href="?status={{ status_filter }}&q={{ search }}" class="filter-pill">✕ Quitar filtro</a>
+  {% endif %}
+</div>
+
+<!-- Table -->
+{% if cvs %}
+<div class="card" style="padding:0;overflow:hidden">
+  <table>
+    <thead>
+      <tr>
+        <th>Candidato</th>
+        <th>Puesto</th>
+        <th style="min-width:150px">Puntuación IA</th>
+        <th>Fase</th>
+        <th>Estado</th>
+        <th>Aplicó</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for cv in cvs %}
+      <tr>
+        <td>
+          <div style="font-weight:800">
+            {{ cv.name }}
+            {% if cv.starred %}<span style="color:var(--yellow)">★</span>{% endif %}
+            {% if cv.pdf_path %}<span style="font-size:10px;color:var(--muted);margin-left:4px">📄</span>{% endif %}
+          </div>
+          <div style="font-size:11px;color:var(--muted)">{{ cv.email or '—' }}</div>
+        </td>
+        <td style="color:var(--muted);font-size:12px">{{ cv.position }}</td>
+        <td>
+          {% set c = "#00C48C" if cv.score >= 80 else "#F5A623" if cv.score >= 60 else "#FF4060" %}
+          <div class="score-bar-wrap">
+            <div class="score-bar-track">
+              <div class="score-bar-fill" style="width:{{ cv.score }}%;background:{{ c }}"></div>
+            </div>
+            <span class="score-label" style="color:{{ c }}">{{ cv.score }}</span>
+          </div>
+        </td>
+        <td><span class="badge badge-phase">{{ cv.phase }}</span></td>
+        <td><span class="badge badge-{{ cv.status }}">{{ cv.status }}</span></td>
+        <td style="font-size:11px;color:var(--muted)">{{ cv.applied_date }}</td>
+        <td><a href="{{ url_for('cv_detail', cv_id=cv.id) }}" class="btn btn-muted btn-sm">Ver →</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card" style="text-align:center;padding:60px;color:var(--muted)">
+  <div style="font-size:40px;margin-bottom:14px">📭</div>
+  <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px">Sin resultados</div>
+  <div style="font-size:12px">Prueba con otros filtros o añade un candidato</div>
+  <div style="margin-top:20px;display:flex;gap:10px;justify-content:center">
+    <button class="btn btn-primary" onclick="openAnalyzeModal()">✦ Analizar PDF con IA</button>
+    <a href="{{ url_for('add_cv') }}" class="btn btn-muted">+ Añadir manual</a>
+  </div>
+</div>
+{% endif %}
+
+<!-- ── MODAL: Analizar PDF ── -->
+<div class="modal-overlay" id="analyzeModal" style="display:none">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div class="modal-title">✦ Analizar CV con IA</div>
+      <button class="modal-close" onclick="closeAnalyzeModal()">✕</button>
+    </div>
+
+    <!-- Mode toggle -->
+    <div style="display:flex;background:var(--surface2);border-radius:12px;padding:4px;gap:4px;margin-bottom:20px">
+      <button id="modePdfBtn" onclick="setMode('pdf')" class="btn btn-primary btn-sm" style="flex:1;border-radius:9px">📄 Subir PDF</button>
+      <button id="modeTextBtn" onclick="setMode('text')" class="btn btn-muted btn-sm" style="flex:1;border-radius:9px">✏️ Pegar texto</button>
+    </div>
+
+    <!-- PDF zone -->
+    <div id="pdfZone">
+      <div class="upload-zone" id="dropZone" onclick="document.getElementById('pdfInput').click()"
+           ondragover="ev(event)" ondragleave="dl()" ondrop="dp(event)">
+        <div id="dropContent">
+          <div class="upload-icon">📄</div>
+          <div class="upload-title">Arrastra el PDF aquí</div>
+          <div class="upload-sub">o haz clic para seleccionar</div>
+          <div style="margin-top:10px;background:var(--faint);border-radius:8px;padding:4px 12px;display:inline-block;font-size:10px;color:var(--muted)">Solo archivos .pdf · Máx. 16MB</div>
+        </div>
+      </div>
+      <input type="file" id="pdfInput" accept="application/pdf" style="display:none" onchange="handleFile(this.files[0])"/>
+    </div>
+
+    <!-- Text zone -->
+    <div id="textZone" style="display:none">
+      <div class="form-group">
+        <label class="form-label">Texto del currículo</label>
+        <textarea id="cvText" class="form-control" rows="8" placeholder="Pega aquí el contenido completo del CV…"></textarea>
+      </div>
+    </div>
+
+    <button id="analyzeBtn" onclick="analyzeCV()" class="btn btn-primary btn-full" style="margin-top:14px" disabled>
+      ✦ Analizar con IA
+    </button>
+
+    <!-- Result -->
+    <div id="analyzeResult" style="display:none">
+      <div class="ai-box">
+        <div class="ai-box-label">✦ Análisis de la IA</div>
+        <div id="aiText"></div>
+      </div>
+
+      <!-- Save form -->
+      <div class="section-label">Guardar candidato</div>
+      <div class="grid-2" style="gap:12px;margin-bottom:12px">
+        <div class="form-group" style="margin:0"><label class="form-label">Nombre</label><input id="saveName" class="form-control" placeholder="Nombre Apellidos"/></div>
+        <div class="form-group" style="margin:0"><label class="form-label">Puesto</label><input id="savePos" class="form-control" placeholder="Puesto al que aplica"/></div>
+        <div class="form-group" style="margin:0"><label class="form-label">Email</label><input id="saveEmail" class="form-control" placeholder="email@..."/></div>
+        <div class="form-group" style="margin:0"><label class="form-label">Teléfono</label><input id="savePhone" class="form-control" placeholder="+34 6XX…"/></div>
+        <div class="form-group" style="margin:0"><label class="form-label">Experiencia</label><input id="saveExp" class="form-control" placeholder="Ej: 3 años"/></div>
+        <div class="form-group" style="margin:0"><label class="form-label">Educación</label><input id="saveEdu" class="form-control" placeholder="Grado en…"/></div>
+      </div>
+      <div class="form-group"><label class="form-label">Habilidades (separadas por coma)</label><input id="saveSkills" class="form-control" placeholder="React, Python, SQL…"/></div>
+      <button onclick="saveCandidate()" class="btn btn-success btn-full">✓ Guardar candidato</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentMode = 'pdf';
+let pdfFilename = '';
+let aiAnalysis = '';
+let aiScore = 60;
+let aiStatus = 'revisar';
+
+function openAnalyzeModal() { document.getElementById('analyzeModal').style.display='flex'; }
+function closeAnalyzeModal() {
+  document.getElementById('analyzeModal').style.display='none';
+  document.getElementById('analyzeResult').style.display='none';
+  document.getElementById('pdfInput').value='';
+  resetDrop();
+}
+function openUploadModal() { openAnalyzeModal(); }
+
+function setMode(m) {
+  currentMode = m;
+  document.getElementById('pdfZone').style.display = m==='pdf'?'block':'none';
+  document.getElementById('textZone').style.display = m==='text'?'block':'none';
+  document.getElementById('modePdfBtn').className = m==='pdf'?'btn btn-primary btn-sm':'btn btn-muted btn-sm';
+  document.getElementById('modeTextBtn').className = m==='text'?'btn btn-primary btn-sm':'btn btn-muted btn-sm';
+  document.getElementById('analyzeBtn').style.setProperty('--x','');
+  checkCanAnalyze();
+  document.getElementById('modePdfBtn').style.flex='1';
+  document.getElementById('modeTextBtn').style.flex='1';
+  document.getElementById('modePdfBtn').style.borderRadius='9px';
+  document.getElementById('modeTextBtn').style.borderRadius='9px';
+}
+
+function checkCanAnalyze() {
+  const canPdf = currentMode==='pdf' && pdfFilename !== '';
+  const canText = currentMode==='text' && document.getElementById('cvText').value.trim().length > 20;
+  document.getElementById('analyzeBtn').disabled = !(canPdf || canText);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('cvText').addEventListener('input', checkCanAnalyze);
+});
+
+function ev(e) { e.preventDefault(); document.getElementById('dropZone').classList.add('drag-over'); }
+function dl() { document.getElementById('dropZone').classList.remove('drag-over'); }
+function dp(e) { e.preventDefault(); dl(); handleFile(e.dataTransfer.files[0]); }
+
+function handleFile(file) {
+  if(!file || file.type !== 'application/pdf') { alert('Solo se aceptan archivos PDF'); return; }
+  const zone = document.getElementById('dropZone');
+  zone.classList.add('has-file');
+  zone.classList.remove('drag-over');
+  document.getElementById('dropContent').innerHTML = `
+    <div style="font-size:36px;margin-bottom:8px">✅</div>
+    <div style="font-size:14px;font-weight:800;color:var(--green)">${file.name}</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:4px">PDF listo para analizar</div>
+    <button onclick="resetDrop()" style="margin-top:10px;background:none;border:1px solid var(--border2);border-radius:8px;color:var(--muted);font-size:11px;padding:4px 12px;cursor:pointer;font-family:inherit">Quitar</button>
+  `;
+  // Store file for upload
+  window._pdfFile = file;
+  pdfFilename = 'pending';
+  checkCanAnalyze();
+}
+
+function resetDrop() {
+  const zone = document.getElementById('dropZone');
+  zone.classList.remove('has-file','drag-over');
+  document.getElementById('dropContent').innerHTML = `
+    <div class="upload-icon">📄</div>
+    <div class="upload-title">Arrastra el PDF aquí</div>
+    <div class="upload-sub">o haz clic para seleccionar</div>
+    <div style="margin-top:10px;background:var(--faint);border-radius:8px;padding:4px 12px;display:inline-block;font-size:10px;color:var(--muted)">Solo archivos .pdf · Máx. 16MB</div>
+  `;
+  window._pdfFile = null;
+  pdfFilename = '';
+  document.getElementById('pdfInput').value='';
+  checkCanAnalyze();
+}
+
+async function analyzeCV() {
+  const btn = document.getElementById('analyzeBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="dots-loader"><span></span><span></span><span></span></span> Analizando con IA…';
+
+  try {
+    if(currentMode === 'pdf') {
+      const fd = new FormData();
+      fd.append('pdf', window._pdfFile);
+      const res = await fetch('/api/cv/upload-pdf', { method:'POST', body: fd });
+      const data = await res.json();
+      if(data.error) { alert(data.error); return; }
+      aiAnalysis = data.analysis;
+      aiScore = data.score;
+      aiStatus = data.status;
+      pdfFilename = data.pdf_filename;
+    } else {
+      const text = document.getElementById('cvText').value;
+      const res = await fetch('/api/cv/upload-pdf', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ text })
+      });
+      // fallback: send as text via form
+      const fd = new FormData();
+      const blob = new Blob([text], {type:'application/pdf'});
+      // We need the text-mode endpoint; handle separately
+      const r2 = await fetch('/api/chat', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          message: `Analiza este currículo:\n${text}\n\nProporciona: resumen ejecutivo, puntos fuertes, puntos débiles, recomendación (top/revisar/descartar), PUNTUACIÓN: XX/100`,
+          history: []
+        })
+      });
+      const d2 = await r2.json();
+      aiAnalysis = d2.response || '';
+      const m = aiAnalysis.match(/PUNTUACI[ÓO]N[:\s]+(\d+)/i);
+      aiScore = m ? Math.min(100, parseInt(m[1])) : 60;
+      aiStatus = aiScore>=80?'top':aiScore>=60?'revisar':'descartado';
+      pdfFilename = '';
+    }
+
+    document.getElementById('aiText').textContent = aiAnalysis;
+    document.getElementById('analyzeResult').style.display = 'block';
+  } catch(e) {
+    alert('Error al analizar. Verifica que Ollama esté ejecutándose.');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '✦ Analizar de nuevo';
+  }
+}
+
+async function saveCandidate() {
+  const data = {
+    name: document.getElementById('saveName').value || 'Sin nombre',
+    position: document.getElementById('savePos').value || 'Sin especificar',
+    email: document.getElementById('saveEmail').value,
+    phone: document.getElementById('savePhone').value,
+    experience: document.getElementById('saveExp').value,
+    education: document.getElementById('saveEdu').value,
+    skills: document.getElementById('saveSkills').value,
+    score: aiScore,
+    status: aiStatus,
+    analysis: aiAnalysis,
+    pdf_filename: pdfFilename,
+    summary: aiAnalysis.substring(0, 300)
+  };
+  const res = await fetch('/api/cv/save-from-pdf', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(data)
+  });
+  const d = await res.json();
+  if(d.ok) { closeAnalyzeModal(); window.location.reload(); }
+}
+</script>
+{% endblock %}

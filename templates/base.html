@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{% block title %}s.curriculums{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}"/>
+  {% block head %}{% endblock %}
+</head>
+<body>
+{% if session.get('user_id') %}
+<div class="layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <span class="brand-name">s.curriculums</span>
+      <span class="brand-sub">Sistema RRHH</span>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="{{ url_for('dashboard') }}" class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}">
+        <span class="nav-icon">⊞</span><span>Dashboard</span>
+      </a>
+      <a href="{{ url_for('curriculos') }}" class="nav-link {% if request.endpoint in ['curriculos','cv_detail','add_cv'] %}active{% endif %}">
+        <span class="nav-icon">📄</span><span>Currículos</span>
+      </a>
+      <a href="{{ url_for('solicitudes') }}" class="nav-link {% if request.endpoint in ['solicitudes','add_solicitud'] %}active{% endif %}">
+        <span class="nav-icon">📋</span><span>Solicitudes</span>
+      </a>
+      <a href="{{ url_for('asistente') }}" class="nav-link {% if request.endpoint == 'asistente' %}active{% endif %}">
+        <span class="nav-icon">✦</span><span>Asistente IA</span>
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar">{{ session.get('user_name','U')[0] }}</div>
+        <div>
+          <div class="user-name">{{ session.get('user_name','Usuario') }}</div>
+          <div class="user-role">{{ session.get('user_role','rrhh') }}</div>
+        </div>
+      </div>
+      <a href="{{ url_for('logout') }}" class="logout-btn">Salir →</a>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main-content">
+    <div class="top-bar">
+      <div>
+        <h1 class="page-title">{% block page_title %}{% endblock %}</h1>
+        <p class="page-sub">{% block page_sub %}{% endblock %}</p>
+      </div>
+      <div class="top-actions">{% block top_actions %}{% endblock %}</div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+        <div class="flash flash-{{ cat }}">{{ msg }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="page-body">
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+</div>
+{% else %}
+  {% block auth_content %}{% endblock %}
+{% endif %}
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>
