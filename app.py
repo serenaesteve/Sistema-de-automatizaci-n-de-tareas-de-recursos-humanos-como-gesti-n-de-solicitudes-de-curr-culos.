@@ -154,7 +154,7 @@ def ask_ollama(prompt, system=""):
             "model": OLLAMA_MODEL,
             "prompt": full_prompt,
             "stream": False
-        }, timeout=120)
+        }, timeout=999)
         data = res.json()
         return data.get("response", "Sin respuesta de la IA.")
     except requests.exceptions.ConnectionError:
